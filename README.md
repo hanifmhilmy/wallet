@@ -1,6 +1,6 @@
-# Wallet — Kotlin Clean Architecture + CQRS
+# Wallet — Kotlin Clean Architecture + Double-Entry Ledger
 
-Money management REST API — **Kotlin**, **Spring WebFlux**, **Coroutines**, **Arrow-kt**, single **PostgreSQL** database via R2DBC. Redis-ready cache port included.
+Money management REST API for transaction recording only — **Kotlin**, **Spring WebFlux**, **Coroutines**, **Arrow-kt**, PostgreSQL for transactional state, Cassandra for ledger state. PASETO authentication is modeled as a port plus adapter. Redis-ready cache port included.
 
 ---
 
@@ -15,36 +15,44 @@ Money management REST API — **Kotlin**, **Spring WebFlux**, **Coroutines**, **
                         │
 ┌───────────────────────▼──────────────────────────────┐
 │  Application                                          │
-│  CommandService · QueryService                        │
-│  AppError · CachePort (interface)                     │
+│  use cases · ports · orchestration                    │
+│  auth · ledger · transaction recording               │
 └───────────┬──────────────────────┬───────────────────┘
             │                      │
 ┌───────────▼──────────┐  ┌────────▼──────────────────┐
 │  Domain               │  │  Infrastructure            │
-│  models · valueobjects│  │  persistence/ (R2DBC PG)   │
-│  events · errors      │  │  config/                   │
-│  (zero dependencies)  │  │  NoOpCacheAdapter (stub)   │
-└───────────────────────┘  │  clients/                  │
+│  value objects        │  │  persistence/postgres      │
+│  accounting rules     │  │  persistence/cassandra     │
+│  errors (zero dep)    │  │  security/config           │
+└───────────────────────┘  │  cache/clients             │
                            └────────────────────────────┘
 ```
 
-## Domain Aggregates
+## Domain Scope
+
+- User identity and authorization claims
+- Wallets and accounts
+- Double-entry ledger transactions and entries
+- Append-only ledger auditability
 
 
 ## Key Patterns
 
-- **CQRS** — Commands mutate state; queries read (add Redis caching via `CachePort` when ready)
-- **Rich domain models** — private setters, `Either`-returning business methods, always-valid state
-- **Arrow `Either<AppError, T>`** — explicit error handling, no exceptions in business logic
-- **CachePort** — interface in `application/common/ports/cache`; currently wired to `NoOpCacheAdapter`; swap in `RedisCacheAdapter` without touching any other layer
+- **Layered ports** — application depends on ports, infrastructure fulfills them
+- **Immutable domain** — small value objects and explicit accounting rules
+- **Arrow `Either<DomainError, T>`** — explicit error handling, no exceptions in use cases
+- **PASETO auth** — token issuance and verification live behind `PasetoTokenPort`
+- **Double-entry ledger** — every transaction records one debit and one credit
+- **Recording only** — no direct payment execution, no payment gateway orchestration
 
 ## Tech Stack
 
 | Concern    | Library                              |
 |------------|--------------------------------------|
 | Web        | Spring WebFlux + Coroutines          |
-| Database   | R2DBC + PostgreSQL                   |
-| Cache      | NoOp stub → Redis (when ready)       |
+| Database   | PostgreSQL + Cassandra               |
+| Cache      | Redis-ready port                     |
 | Functional | Arrow-kt (`Either`, `arrow-core`)    |
+| Auth       | PASETO                               |
 | Docs       | SpringDoc OpenAPI 3                  |
 | Build      | Gradle Kotlin DSL                    |

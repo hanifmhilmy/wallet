@@ -33,11 +33,11 @@ extra["springGrpcVersion"] = "1.0.2"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-cassandra")
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("org.springframework.boot:spring-boot-starter-r2dbc")
     implementation("org.springframework.boot:spring-boot-starter-session-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("io.grpc:grpc-services")
     implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -52,6 +52,8 @@ dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
     implementation("io.arrow-kt:arrow-core:2.2.1.1")
     implementation("io.arrow-kt:arrow-fx-coroutines:2.2.1.1")
+    implementation("net.aholbrook.paseto:paseto:0.9.0")
+    implementation("org.postgresql:r2dbc-postgresql")
 
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     developmentOnly("org.springframework.boot:spring-boot-docker-compose")
@@ -62,7 +64,6 @@ dependencies {
 
     // testImplementation
     testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-cassandra-test")
     testImplementation("org.springframework.boot:spring-boot-starter-opentelemetry-test")
     testImplementation("org.springframework.boot:spring-boot-starter-r2dbc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-session-data-redis-test")

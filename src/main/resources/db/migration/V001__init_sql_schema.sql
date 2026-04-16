@@ -1,7 +1,7 @@
 -- ============================================================
 -- Wallet Schema
 -- PostgreSQL 16+
--- Double-entry ledger · append-only · daily balance compaction
+-- Double-entry ledger, append-only, transaction recording only
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -10,6 +10,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "btree_gist"; -- needed for EXCLUDE constraints
 CREATE EXTENSION IF NOT EXISTS bloom;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ============================================================
 -- TYPES
@@ -40,7 +41,8 @@ CREATE TABLE users
     updated_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
 
     CONSTRAINT pk_users PRIMARY KEY (id),
-    CONSTRAINT uq_users_email UNIQUE (email)
+    CONSTRAINT uq_users_email UNIQUE (email),
+    CONSTRAINT uq_users_username UNIQUE (username)
 );
 
 CREATE INDEX bloom_users ON users
@@ -87,11 +89,7 @@ ON CONFLICT DO NOTHING;
 -- WALLETS
 -- One user-owned ASSET pocket linked 1:1 to an accounts row.
 --
--- Balance strategy:
---   balance        = last compacted snapshot
---   compacted_at   = timestamp of that snapshot
---   live balance   = balance + SUM(ledger_entries WHERE created_at > compacted_at)
---   (served from Redis cache; falls back to wallet_running_balance view)
+-- Balance is derived from ledger history; snapshots are optional.
 -- ============================================================
 
 CREATE TABLE wallets
@@ -102,7 +100,6 @@ CREATE TABLE wallets
     name         VARCHAR(100)   NOT NULL,
     balance      NUMERIC(20, 4) NOT NULL DEFAULT 0,
     currency     CHAR(3)        NOT NULL DEFAULT 'IDR',
-    compacted_at TIMESTAMPTZ    NOT NULL DEFAULT now(),
     version      BIGINT         NOT NULL DEFAULT 0,
     created_at   TIMESTAMPTZ    NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ    NOT NULL DEFAULT now(),
@@ -113,10 +110,7 @@ CREATE TABLE wallets
     CONSTRAINT uq_wallets_account UNIQUE (account_id), -- 1:1 with accounts
     CONSTRAINT uq_wallets_user_name UNIQUE (user_id, name),
     CONSTRAINT ck_wallets_balance CHECK (balance >= 0),
-    -- Wallet currency must match its account currency
-    CONSTRAINT ck_wallets_currency CHECK (currency = (SELECT a.currency
-                                                      FROM accounts a
-                                                      WHERE a.id = account_id))
+    CONSTRAINT ck_wallets_currency CHECK (char_length(currency) = 3)
 );
 
 
@@ -182,6 +176,8 @@ CREATE TABLE transactions
     CONSTRAINT ck_transactions_amount CHECK (amount > 0)
 );
 
+CREATE INDEX idx_transactions_user_transacted_at ON transactions (user_id, transacted_at DESC);
+
 
 -- ============================================================
 -- LEDGER ENTRIES  (append-only — never UPDATE or DELETE)
@@ -215,30 +211,9 @@ CREATE TABLE ledger_entries
     CONSTRAINT uq_ledger_txn_type UNIQUE (transaction_id, entry_type)
 );
 
+-- PASETO auth state can remain stateless; no token table is required.
 
--- ============================================================
--- COMPACTION LOG
--- Audit trail of each daily balance compaction run.
--- The compaction job:
---   1. SELECT SUM of uncompacted ledger entries for the wallet
---   2. UPDATE wallets SET balance = balance + delta, compacted_at = now()
---   3. INSERT a row here for traceability
--- ============================================================
-
-CREATE TABLE compaction_log
-(
-    id             UUID           NOT NULL DEFAULT gen_random_uuid(),
-    wallet_id      UUID           NOT NULL,
-    compacted_from TIMESTAMPTZ    NOT NULL,
-    compacted_to   TIMESTAMPTZ    NOT NULL,
-    entries_count  INT            NOT NULL DEFAULT 0,
-    delta_amount   NUMERIC(20, 4) NOT NULL DEFAULT 0,
-    ran_at         TIMESTAMPTZ    NOT NULL DEFAULT now(),
-
-    CONSTRAINT pk_compaction_log PRIMARY KEY (id),
-    CONSTRAINT fk_compaction_wallet FOREIGN KEY (wallet_id) REFERENCES wallets (id),
-    CONSTRAINT ck_compaction_window CHECK (compacted_from < compacted_to)
-);
+-- Optional projection history may be added later in Cassandra or Redis.
 
 
 -- ============================================================
@@ -255,7 +230,6 @@ CREATE INDEX idx_accounts_type ON accounts (type);
 
 -- Wallets
 CREATE INDEX idx_wallets_user_id ON wallets (user_id);
-CREATE INDEX idx_wallets_compacted_at ON wallets (compacted_at);
 
 -- Transactions — most queries filter by user + date range
 CREATE INDEX idx_transactions_user_date ON transactions (user_id, transacted_at DESC);
@@ -267,44 +241,4 @@ CREATE INDEX idx_transactions_category ON transactions (category_id);
 CREATE INDEX idx_ledger_account_date ON ledger_entries (account_id, created_at DESC);
 CREATE INDEX idx_ledger_transaction_id ON ledger_entries (transaction_id);
 
--- Compaction log
-CREATE INDEX idx_compaction_wallet_ran ON compaction_log (wallet_id, ran_at DESC);
-
-
--- ============================================================
--- VIEW: wallet_running_balance
--- Live balance = compacted snapshot + uncompacted ledger delta.
--- Used as Redis cache fallback.
--- Query pattern: WHERE wallet_id = $1
--- ============================================================
-
-CREATE OR REPLACE VIEW wallet_running_balance AS
-SELECT w.id          AS wallet_id,
-       w.user_id,
-       w.name,
-       w.currency,
-       w.balance     AS compacted_balance,
-       w.compacted_at,
-       COALESCE(
-                       SUM(
-                       CASE le.entry_type
-                           WHEN 'CREDIT' THEN le.amount
-                           WHEN 'DEBIT' THEN -le.amount
-                           END
-                          ) FILTER (WHERE le.created_at > w.compacted_at),
-                       0
-       )             AS uncompacted_delta,
-       w.balance + COALESCE(
-                       SUM(
-                       CASE le.entry_type
-                           WHEN 'CREDIT' THEN le.amount
-                           WHEN 'DEBIT' THEN -le.amount
-                           END
-                          ) FILTER (WHERE le.created_at > w.compacted_at),
-                       0
-                   ) AS running_balance
-FROM wallets w
-         JOIN accounts a ON a.id = w.account_id
-         LEFT JOIN ledger_entries le ON le.account_id = a.id
-GROUP BY w.id, w.user_id, w.name, w.currency,
-         w.balance, w.compacted_at;
+-- Cassandra projections will provide optional read models later.
