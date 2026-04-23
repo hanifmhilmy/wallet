@@ -1,17 +1,16 @@
-package com.cystg.wallet.api.transaction
+package com.cystg.wallet.api.user
 
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/transactions")
-class TransactionController {
+@RequestMapping("/api/v1/users")
+class UserController {
     
     @PostMapping
-    fun createTransaction(@RequestBody request: CreateTransactionRequest) {
+    fun createUser(@RequestBody request: CreateUserRequest) {
         // Implementation to be added
     }
 }

@@ -3,7 +3,6 @@
 Money management REST API for transaction recording only — **Kotlin**, **Spring WebFlux**, **Coroutines**, **Arrow-kt**, PostgreSQL for transactional state, Cassandra for ledger state. PASETO authentication is modeled as a port plus adapter. Redis-ready cache port included.
 
 ---
-
 ## Architecture Layers
 
 ```
@@ -34,7 +33,6 @@ Money management REST API for transaction recording only — **Kotlin**, **Sprin
 - Wallets and accounts
 - Double-entry ledger transactions and entries
 - Append-only ledger auditability
-
 
 ## Key Patterns
 

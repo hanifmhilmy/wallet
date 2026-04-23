@@ -4,8 +4,7 @@ import com.cystg.wallet.application.common.ports.AuthorizationPort
 import com.cystg.wallet.application.common.ports.LedgerPersistencePort
 import com.cystg.wallet.application.common.ports.PasetoTokenPort
 import com.cystg.wallet.application.common.ports.TransactionPersistencePort
-import com.cystg.wallet.application.ledger.RecordTransactionUseCase
-import com.cystg.wallet.application.ledger.TransactionRecorderService
+import com.cystg.wallet.application.transaction.RecordTransactionUseCase
 import com.cystg.wallet.infrastructure.persistence.cassandra.CassandraLedgerAdapter
 import com.cystg.wallet.infrastructure.persistence.postgres.PostgresTransactionAdapter
 import com.cystg.wallet.infrastructure.security.PasetoAuthorizationAdapter
@@ -32,10 +31,8 @@ class ApplicationConfig {
     fun recordTransactionUseCase(
         transactionPersistencePort: TransactionPersistencePort,
         ledgerPersistencePort: LedgerPersistencePort,
-        authorizationPort: AuthorizationPort,
-    ): RecordTransactionUseCase = TransactionRecorderService(
+    ): RecordTransactionUseCase = RecordTransactionUseCase(
         transactionPersistencePort = transactionPersistencePort,
         ledgerPersistencePort = ledgerPersistencePort,
-        authorizationPort = authorizationPort,
     )
 }

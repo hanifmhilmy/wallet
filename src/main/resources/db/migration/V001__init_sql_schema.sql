@@ -50,7 +50,6 @@ CREATE INDEX bloom_users ON users
     WITH (length = 80, col1 = 3, col2 = 3, col3 = 2);
 
 
-
 -- ============================================================
 -- ACCOUNTS  (double-entry chart of accounts)
 -- Every ledger debit/credit references an account.
@@ -87,8 +86,7 @@ ON CONFLICT DO NOTHING;
 
 -- ============================================================
 -- WALLETS
--- One user-owned ASSET pocket linked 1:1 to an accounts row.
---
+-- User-owned financial containers that hold balances.
 -- Balance is derived from ledger history; snapshots are optional.
 -- ============================================================
 
@@ -98,7 +96,6 @@ CREATE TABLE wallets
     account_id   UUID           NOT NULL,
     user_id      UUID           NOT NULL,
     name         VARCHAR(100)   NOT NULL,
-    balance      NUMERIC(20, 4) NOT NULL DEFAULT 0,
     currency     CHAR(3)        NOT NULL DEFAULT 'IDR',
     version      BIGINT         NOT NULL DEFAULT 0,
     created_at   TIMESTAMPTZ    NOT NULL DEFAULT now(),
@@ -109,7 +106,6 @@ CREATE TABLE wallets
     CONSTRAINT fk_wallets_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     CONSTRAINT uq_wallets_account UNIQUE (account_id), -- 1:1 with accounts
     CONSTRAINT uq_wallets_user_name UNIQUE (user_id, name),
-    CONSTRAINT ck_wallets_balance CHECK (balance >= 0),
     CONSTRAINT ck_wallets_currency CHECK (char_length(currency) = 3)
 );
 
