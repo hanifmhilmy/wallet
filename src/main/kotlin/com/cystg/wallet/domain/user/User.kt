@@ -14,9 +14,9 @@ data class User(
     val version: Long = 0,
 ) {
     companion object {
-        fun register(rawEmail: String, username: String, passwordHash: String): Either<DomainError, User> {
+        fun register(rawEmail: String, username: String, passwordHash: String?): Either<DomainError, User> {
             if (username.isBlank()) return Either.Left(DomainError("Username must not be blank"))
-            if (passwordHash.isBlank()) return Either.Left(DomainError("Password hash must not be blank"))
+            if (passwordHash.isNullOrBlank()) return Either.Left(DomainError("Password hash must not be blank"))
 
             return EmailAddress.of(rawEmail).fold(
                 onSuccess = {

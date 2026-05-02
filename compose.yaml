@@ -9,11 +9,20 @@ services:
     image: 'postgres:latest'
     environment:
       - 'POSTGRES_DB=wallet_db'
-      - 'POSTGRES_PASSWORD=postgres'
-      - 'POSTGRES_USER=anfield6CL'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-anfield6CL}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-postgres}'
     ports:
       - '5432'
   redis:
     image: 'redis:latest'
     ports:
       - '6379'
+  cassandra:
+    image: 'cassandra:latest'
+    ports:
+      - '9042:9042'
+      - '9142:9142'
+    environment:
+      - 'CASSANDRA_START_RPC=true'
+      - 'CASSANDRA_LISTEN_ADDRESS=cassandra'
+      - 'CASSANDRA_BROADCAST_ADDRESS=cassandra'
